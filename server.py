@@ -1,4 +1,5 @@
 import socket
+import threading
 from datetime import datetime
 
 #functie care primeste un string si verifica daca stringul este o data
@@ -48,6 +49,38 @@ def get_zodiac_sign(birthdate):
     # daca nu gaseste o zodie return None
     return None
 
+# functia care de tratare client pe thread separat
+def handle_user(conn, addr):
+    # afisarea adresei clientului, colorat verde si bold
+    print('\033[1;32mS-a conectat:' + str(addr) + '\033[0m')
+    # with conn porneste un block de cod care se executa cat timp conexiunea este deschisa
+    # conn va fi inchisa automat
+    with conn:
+        while True:
+            # asteapta primirea de la client a datelor si le asigneaza var data
+            # se vor primi maxim 1024 de bytes
+            data = conn.recv(1024)
+            # verifica daca datele primite de la client sunt sub forma unei date dd-mm-yyyy
+            if is_date(data.decode()):
+                # calculeaza varsta utilizatorului daca daca este valida
+                age = years_between_dates(datetime.today().strftime("%d-%m-%Y"),
+                                          data.decode())
+            else:
+                # data invalida
+                age = -1
+            # daca nu a primit nimic de la utilizator, se iese din loop
+            if not data: break
+            # daca daca este valida si avem o varsta corecta
+            if age != -1:
+                print('\tUtilizatorul are', age, 'ani si este zodia', get_zodiac_sign(data.decode()))
+                # se trimite clientului data procesata sub forma de varsta alaturi de zodia sa
+                conn.sendall(('Varsta ta este de ' + str(age) +
+                              ' ani si esti zodia ' + get_zodiac_sign(data.decode())).encode())
+            else:
+                # altfel se specifica faptul ca data nu a fost in formatul acceptat de server
+                conn.sendall(b'Malformed date!')
+
+
 HOST = ''
 PORT = 8116
 # deschide un socket TCP folosint biblioteca socket si asgineaza acesta asupra variabilei s
@@ -63,32 +96,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     while True:
         # asteapta o viitoare conexiune si o accepta. Metoda accept este blocanta pana se conecteaza
         # clientul, iar la conectare se returneaza un nou socket reprezentand conexiunea
-        conn, addr = s.accept()
-        # afisarea adresei clientului, colorat verde si bold
-        print('\033[1;32mS-a conectat:'+ str(addr) +'\033[0m')
-        # with conn porneste un block de cod care se executa cat timp conexiunea este deschisa
-        # conn va fi inchisa automat
-        with conn:
-            while True:
-                # asteapta primirea de la client a datelor si le asigneaza var data
-                # se vor primi maxim 1024 de bytes
-                data = conn.recv(1024)
-                # verifica daca datele primite de la client sunt sub forma unei date dd-mm-yyyy
-                if is_date(data.decode()):
-                    # calculeaza varsta utilizatorului daca daca este valida
-                    age = years_between_dates(datetime.today().strftime("%d-%m-%Y"),
-                                              data.decode())
-                else:
-                    # data invalida
-                    age = -1
-                # daca nu a primit nimic de la utilizator, se iese din loop
-                if not data: break
-                # daca daca este valida si avem o varsta corecta
-                if age != -1:
-                    print('\tUtilizatorul are',age,'ani si este zodia', get_zodiac_sign(data.decode()))
-                    # se trimite clientului data procesata sub forma de varsta alaturi de zodia sa
-                    conn.sendall(('Varsta ta este de ' + str(age) +
-                                  ' ani si esti zodia '+get_zodiac_sign(data.decode())).encode())
-                else:
-                    # altfel se specifica faptul ca data nu a fost in formatul acceptat de server
-                    conn.sendall(b'Malformed date!')
+        connection, address = s.accept()
+        # lanseaz functia de tratare client pe un alt thread astfel incat sa poata permite si alti useri
+        threading.Thread(target=handle_user, args=(connection, address)).start()
