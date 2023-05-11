@@ -10,6 +10,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
 
     date='dd/mm/yyyy'
+    # clientul va trimite date de nastere cat timp nu scrie 'done'
+    # se va patra conexiunea deschisa
     while date!='done':
         # afisare prompt de input al datei de nastere, culoare albastra, bold
         print("\033[1;34mEnter your birth date as dd-mm-yyyy(or 'done' to quit):\033[0m")
